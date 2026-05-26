@@ -1,0 +1,20 @@
+# Force LF line endings for everything. Vercel + GitHub Actions both run
+# Linux; CRLF on Windows breaks shell scripts and creates noisy diffs.
+
+* text=auto eol=lf
+
+# Lockfile and generated artifacts: still LF, but mark as binary-ish so diffs
+# stay compact and merges don't try to be clever.
+pnpm-lock.yaml -diff -merge linguist-generated
+
+# Binary file types
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
