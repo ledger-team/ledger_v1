@@ -1,0 +1,11 @@
+# pnpm 11+ moved several settings out of package.json. This file holds them.
+# We do not use pnpm workspaces — this is a single Next.js app.
+#
+# `allowBuilds` whitelists packages whose install scripts may run.
+# All three below are standard transitive deps of Next.js, Vitest, and ESLint
+# that need to compile or download platform-specific native binaries.
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
