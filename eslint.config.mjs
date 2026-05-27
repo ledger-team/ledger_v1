@@ -17,6 +17,14 @@ const eslintConfig = [
     },
   },
   {
+    // Scripts run outside the Next.js runtime (seed, future migration helpers,
+    // CLIs) are allowed to use console.log freely.
+    files: ['prisma/**/*.ts', 'scripts/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+  {
     ignores: ['.next/**', 'node_modules/**', 'coverage/**', 'next-env.d.ts'],
   },
 ]
