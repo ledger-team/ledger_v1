@@ -2,10 +2,16 @@
 # We do not use pnpm workspaces — this is a single Next.js app.
 #
 # `allowBuilds` whitelists packages whose install scripts may run.
-# All three below are standard transitive deps of Next.js, Vitest, and ESLint
-# that need to compile or download platform-specific native binaries.
+# Every entry is a standard transitive dep of Next, Prisma, Sentry, Vitest,
+# or ESLint that needs to compile or download platform-specific binaries.
 
 allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  '@sentry/cli': true
+  core-js: true
   esbuild: true
+  prisma: true
+  protobufjs: true
   sharp: true
   unrs-resolver: true
