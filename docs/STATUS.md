@@ -2,7 +2,7 @@
 
 *Living document. Updated as the foundation builds out. Source of truth for "what's actually working today."*
 
-*Last updated: 2026-05-26.*
+*Last updated: 2026-05-27.*
 
 ---
 
@@ -14,8 +14,8 @@
 
 | Milestone | State | Notes |
 | --- | --- | --- |
-| **A. Repo & tooling** | 🟡 In progress | Next 15 + React 19 + TS strict + Tailwind v4 + Vitest scaffold |
-| **B. Database foundation** | ⬜ Not started | Prisma + Supabase + RLS migrations |
+| **A. Repo & tooling** | ✅ Done | Next 15 + React 19 + TS strict + Tailwind v4 + Vitest. PR #1. |
+| **B. Database foundation** | 🟡 In progress | Prisma 5 + Supabase + 16 tables with RLS on all of them. Schema doc at `docs/db/SCHEMA.md`. |
 | **C. Observability** | ⬜ Not started | Pino + Sentry + PostHog + AuditLog helper |
 | **D. Security primitives** | ⬜ Not started | AES-256-GCM, withApi wrapper, Upstash rate limit |
 | **E. Authentication** | ⬜ Not started | NextAuth + Resend magic link |

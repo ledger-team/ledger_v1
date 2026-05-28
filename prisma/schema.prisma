@@ -1,0 +1,356 @@
+// Ledger v2 — database schema.
+//
+// IMPORTANT: when Canvas OAuth ships, Canvas tokens MUST flow through the
+// encrypted `CanvasToken` table — never persisted unencrypted in the
+// `Account` table. See docs/db/SCHEMA.md § "OAuth tokens must be encrypted"
+// for the implementation pattern. Account.refresh_token / access_token /
+// id_token are NextAuth adapter requirements but stay NULL in Phase 0
+// (magic-link auth only — no provider issues OAuth tokens).
+//
+// Schema design rationale, RLS policy summary, cascade map, and the
+// polymorphic Post explanation all live in docs/db/SCHEMA.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// =========================================================================
+// Auth (NextAuth v4 adapter schema — column names are mandated by adapter,
+// including the snake_case OAuth columns below)
+// =========================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  // set during onboarding
+  schoolId      String?
+  gradYear      Int?
+  // set when Canvas connects — fixes v1 lesson C5 (don't use email as identity)
+  canvasUserId  String?
+  lastSyncedAt  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  school      School?       @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  accounts    Account[]
+  sessions    Session[]
+  canvasToken CanvasToken?
+  enrollments Enrollment[]
+  posts       Post[]
+  reactions   Reaction[]
+  reports     Report[]
+  studyGuides StudyGuide[]
+  dailyLimits DailyLimit[]
+  auditEvents AuditLog[]    @relation("AuditActor")
+
+  @@unique([schoolId, canvasUserId])
+  @@index([schoolId])
+}
+
+/// NextAuth v4 Account. Snake_case columns are required by the adapter —
+/// they're the only exceptions to v2's camelCase convention. In Phase 0
+/// (magic-link only) every OAuth-related column stays NULL.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// =========================================================================
+// School + Canvas token
+// =========================================================================
+
+model School {
+  id          String   @id @default(cuid())
+  name        String
+  canvasUrl   String   @unique // e.g. https://dsisd.instructure.com
+  emailDomain String?  @unique // optional — reserved for future email-domain matching
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users   User[]
+  courses Course[]
+}
+
+/// Encrypted Canvas API token, AES-256-GCM. Ciphertext format is
+/// "v2:<iv hex>:<tag hex>:<ciphertext hex>". The "v2:" version prefix is
+/// the fix for v1's lack of versioning — lets us rotate algorithms cleanly.
+model CanvasToken {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  encryptedToken String    @db.Text
+  expiresAt      DateTime?
+  rotatedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
+// =========================================================================
+// Canvas data
+// =========================================================================
+
+model Course {
+  id             String    @id @default(cuid())
+  schoolId       String
+  canvasCourseId String
+  name           String
+  courseCode     String
+  currentGrade   String?
+  currentScore   Float?
+  finalGrade     String?
+  finalScore     Float?
+  lastSyncedAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  school      School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sections    Section[]
+  assignments Assignment[]
+
+  @@unique([schoolId, canvasCourseId]) // fixes v1's "uniqueness in code only"
+  @@index([schoolId])
+}
+
+model Section {
+  id              String   @id @default(cuid())
+  courseId        String
+  canvasSectionId String
+  name            String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  enrollments Enrollment[]
+
+  @@unique([courseId, canvasSectionId])
+  @@index([courseId])
+}
+
+model Enrollment {
+  id        String   @id @default(cuid())
+  userId    String
+  sectionId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sectionId])
+  @@index([userId])
+  @@index([sectionId])
+}
+
+model Assignment {
+  id             String    @id @default(cuid())
+  courseId       String
+  canvasId       String
+  name           String
+  description    String?   @db.Text
+  dueAt          DateTime?
+  pointsPossible Float?
+  submissionType String?
+  isTestData     Boolean   @default(false) // v1 seed-data marker, retained
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  studyGuides StudyGuide[]
+
+  @@unique([courseId, canvasId])
+  @@index([courseId, dueAt]) // closes v1's "no indexes" — the dashboard's hot query
+}
+
+// =========================================================================
+// Social — polymorphic Post + Reaction + Report.
+// RLS is "deny all" on these in Phase 0; policies open up when features ship.
+// See docs/db/SCHEMA.md § "Polymorphic Post" for the (targetType, targetId)
+// pattern and its trade-offs.
+// =========================================================================
+
+model Post {
+  id           String         @id @default(cuid())
+  authorId     String
+  schoolId     String
+  // (targetType, targetId) is the polymorphic pointer — no DB FK on targetId.
+  // App + RLS enforce the relationship.
+  targetType   PostTargetType
+  targetId     String
+  parentPostId String? // a comment's parent; native FK because target is always Post
+
+  body        String   @db.Text
+  anonymous   Boolean  @default(false)
+  hidden      Boolean  @default(false)
+  reportCount Int      @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent    Post?      @relation("PostThread", fields: [parentPostId], references: [id], onDelete: Cascade)
+  children  Post[]     @relation("PostThread")
+  reactions Reaction[]
+  reports   Report[]
+
+  @@index([targetType, targetId, createdAt])
+  @@index([schoolId, createdAt])
+  @@index([authorId])
+  @@index([parentPostId])
+}
+
+enum PostTargetType {
+  SECTION // class community feed; targetId = Section.id
+  SCHOOL_HYPE_FEED // schoolwide Hype Feed; targetId = School.id
+  SCHOOL_PULSE // schoolwide Pulse; targetId = School.id
+  SCHOOL_BRACKET // School Bracket polls; targetId = School.id
+  SENIOR_WALL // Senior Wall; targetId = School.id (gated on gradYear at write)
+  POST // comment on a post; targetId = Post.id
+}
+
+model Reaction {
+  id        String       @id @default(cuid())
+  postId    String
+  userId    String
+  type      ReactionType
+  createdAt DateTime     @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId]) // single reaction per user per post; switching replaces
+  @@index([postId])
+  @@index([userId])
+}
+
+enum ReactionType {
+  LIKE
+  CELEBRATE
+  STRESSED
+  LAUGH
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  postId     String
+  reporterId String
+  reason     String   @db.Text
+  createdAt  DateTime @default(now())
+
+  post     Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, reporterId]) // can't report the same post twice
+  @@index([postId])
+}
+
+// =========================================================================
+// AI — anticipated schema. Deny-RLS until Phase 3 (Study Guides) ships.
+// =========================================================================
+
+model StudyGuide {
+  id            String   @id @default(cuid())
+  assignmentId  String
+  userId        String
+  content       String   @db.Text
+  model         String // e.g. "claude-haiku-4-5"
+  promptVersion String // e.g. "v1" — bump when prompt template changes
+  createdAt     DateTime @default(now())
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, userId]) // one guide per user per assignment; regenerate replaces
+  @@index([userId])
+}
+
+model DailyLimit {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  feature   String // e.g. "study-guide"
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // fixes v1 I13
+
+  @@unique([userId, date, feature])
+  @@index([userId, date])
+}
+
+// =========================================================================
+// AuditLog — append-only. UPDATE/DELETE are REVOKED from app_user at the
+// grant level in migration 0002 (defense beyond policy).
+//
+// When a User is deleted, actorUserId is set NULL (NOT cascade) — the row
+// stays for FERPA continuity. actorEmailHash (SHA-256 of email at audit time)
+// is the non-reversible link back to "who" without retaining PII.
+// =========================================================================
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  actorUserId    String?
+  actorEmailHash String? // SHA-256 hex; survives user deletion
+  schoolId       String?
+  action         String // taxonomy: <domain>.<action>.<outcome>
+  targetType     String?
+  targetId       String?
+  metadata       Json     @default("{}") // NO PII — IDs and counts only
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@index([schoolId, createdAt])
+  @@index([createdAt])
+}
