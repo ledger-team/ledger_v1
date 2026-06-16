@@ -33,6 +33,10 @@ export const EVENTS = {
     // Emitted from Milestone G onward.
     viewed: 'dashboard.viewed',
   },
+  onboarding: {
+    // Emitted from Milestone E onward.
+    completed: 'onboarding.completed',
+  },
   smoke: {
     logger: 'smoke.logger.info',
     posthog: 'smoke.posthog.test',
