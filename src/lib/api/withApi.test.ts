@@ -7,11 +7,17 @@ vi.mock('@/lib/auth/session', () => ({ getServerSession: vi.fn() }))
 vi.mock('@/lib/rate-limit/limiter', () => ({ limit: vi.fn() }))
 
 import { withApi } from './withApi'
-import { getServerSession } from '@/lib/auth/session'
+import { getServerSession, type AppSession } from '@/lib/auth/session'
 import { limit } from '@/lib/rate-limit/limiter'
 
 const mockedSession = vi.mocked(getServerSession)
 const mockedLimit = vi.mocked(limit)
+
+function appSession(user: Partial<AppSession['user']> & { id: string }): AppSession {
+  return {
+    user: { email: null, name: null, schoolId: null, gradYear: null, onboarded: false, ...user },
+  }
+}
 
 function req(body?: unknown): NextRequest {
   return new NextRequest('http://localhost/api/test', {
@@ -50,7 +56,7 @@ describe('withApi', () => {
   })
 
   it('returns 400 with issues when the body fails schema validation', async () => {
-    mockedSession.mockResolvedValue({ user: { id: 'u1' } })
+    mockedSession.mockResolvedValue(appSession({ id: 'u1' }))
     const handler = withApi(
       { schema: z.object({ name: z.string().min(1) }) },
       async ({ data }) => NextResponse.json({ data }),
@@ -61,7 +67,7 @@ describe('withApi', () => {
   })
 
   it('passes the parsed body and session to the handler on success', async () => {
-    mockedSession.mockResolvedValue({ user: { id: 'u1', schoolId: 's1' } })
+    mockedSession.mockResolvedValue(appSession({ id: 'u1', schoolId: 's1' }))
     const handler = withApi(
       { schema: z.object({ name: z.string() }) },
       async ({ data, session }) => NextResponse.json({ name: data.name, uid: session?.user.id }),
@@ -72,7 +78,7 @@ describe('withApi', () => {
   })
 
   it('keys the rate limit by user id when authenticated', async () => {
-    mockedSession.mockResolvedValue({ user: { id: 'user-42' } })
+    mockedSession.mockResolvedValue(appSession({ id: 'user-42' }))
     const handler = withApi({}, async () => NextResponse.json({ ok: true }))
     await handler(req())
     expect(mockedLimit).toHaveBeenCalledWith(expect.stringContaining('user-42'), 'api')

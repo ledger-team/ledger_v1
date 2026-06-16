@@ -2,7 +2,7 @@
 
 *Living document. Updated as the foundation builds out. Source of truth for "what's actually working today."*
 
-*Last updated: 2026-06-15.*
+*Last updated: 2026-06-16.*
 
 ---
 
@@ -18,7 +18,7 @@
 | **B. Database foundation** | ✅ Done | Prisma 5 + Supabase + 16 tables with RLS on all of them. PR #2. Schema doc at `docs/db/SCHEMA.md`. |
 | **C. Observability** | ✅ Done | Pino (stdout NDJSON) + Sentry (no source maps) + PostHog (browser + server) + AuditLog helper. RLS isolation test (11 cases) ships here. Runbook at `docs/observability/RUNBOOK.md`. Sentry verified end-to-end 2026-06-15 (SDK-captured `smoke: sentry test` confirmed in dashboard); instrumentation/Sentry config files moved under `src/` so Next 15's hook actually loads. |
 | **D. Security primitives** | 🟡 In progress | AES-256-GCM encryption (`v2:` versioned format, AAD-ready, pure core) + `withApi` wrapper (auth + rate-limit + Zod, protected-by-default) + Upstash sliding-window limiter (dev fail-open / prod fail-closed) + HTTP security headers (CSP/HSTS/X-Frame-Options/etc) at `next.config.ts`. 28 new tests. PR open for review. |
-| **E. Authentication** | ⬜ Not started | NextAuth + Resend magic link |
+| **E. Authentication** | 🟡 In progress | NextAuth v4 (database sessions) + Resend magic-link + Prisma adapter. Default-deny middleware (cookie-presence gate). `/login` + `/login/check-email`, two-step `/onboarding` (school + gradYear + name; Canvas paste is a gated stub — saving lands in F), `/dashboard` placeholder showing real session data. `session.ts` internals swapped to NextAuth; `withApi` untouched. INVITE_ONLY gate. 15 new tests. PR open for review. |
 | **F. Canvas sync** | ⬜ Not started | Invite-only token-paste; full sync pipeline |
 | **G. Dashboard feature** | ⬜ Not started | First plug-and-play feature folder |
 | **H. FERPA delete** | ⬜ Not started | `deleteUserCompletely` + UI |
