@@ -2,7 +2,7 @@
 
 *Living document. Updated as the foundation builds out. Source of truth for "what's actually working today."*
 
-*Last updated: 2026-05-28.*
+*Last updated: 2026-06-15.*
 
 ---
 
@@ -16,7 +16,7 @@
 | --- | --- | --- |
 | **A. Repo & tooling** | ✅ Done | Next 15 + React 19 + TS strict + Tailwind v4 + Vitest. PR #1. |
 | **B. Database foundation** | ✅ Done | Prisma 5 + Supabase + 16 tables with RLS on all of them. PR #2. Schema doc at `docs/db/SCHEMA.md`. |
-| **C. Observability** | 🟡 In progress | Pino (stdout NDJSON) + Sentry (no source maps) + PostHog (browser + server) + AuditLog helper. RLS isolation test (11 cases) ships here. Runbook at `docs/observability/RUNBOOK.md`. |
+| **C. Observability** | ✅ Done | Pino (stdout NDJSON) + Sentry (no source maps) + PostHog (browser + server) + AuditLog helper. RLS isolation test (11 cases) ships here. Runbook at `docs/observability/RUNBOOK.md`. Sentry verified end-to-end 2026-06-15 (SDK-captured `smoke: sentry test` confirmed in dashboard); instrumentation/Sentry config files moved under `src/` so Next 15's hook actually loads. |
 | **D. Security primitives** | ⬜ Not started | AES-256-GCM, withApi wrapper, Upstash rate limit |
 | **E. Authentication** | ⬜ Not started | NextAuth + Resend magic link |
 | **F. Canvas sync** | ⬜ Not started | Invite-only token-paste; full sync pipeline |
