@@ -5,6 +5,12 @@
 // All four observability layers share this taxonomy where possible.
 
 export const EVENTS = {
+  api: {
+    // Emitted by the withApi wrapper (Milestone D onward).
+    request_denied: 'api.request.denied',
+    request_invalid: 'api.request.invalid',
+    request_rate_limited: 'api.request.rate_limited',
+  },
   audit: {
     write_succeeded: 'audit.write.succeeded',
     write_failed: 'audit.write.failed',
