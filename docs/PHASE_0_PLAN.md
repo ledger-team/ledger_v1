@@ -251,7 +251,7 @@ This is the concrete file-by-file list. Paths assume the conventional Next 15 Ap
 | Canvas client | `src/features/canvas-sync/client.ts` | Typed wrapper over Canvas REST API; rate-limit-aware; retries on 429 |
 | Token paste UI | `src/features/canvas-sync/components/ConnectCanvas.tsx` | Only shown if `INVITE_ONLY=true` and current user email is in the allowlist |
 | Token storage action | `src/features/canvas-sync/actions/saveToken.ts` | Encrypts then stores `CanvasToken`; audits |
-| Sync action | `src/features/canvas-sync/actions/sync.ts` | Decrypts (audits), calls Canvas, writes courses + assignments in a transaction. On any error, transaction rolls back, error to Sentry, event to Pino, `lastSyncedAt` not bumped. |
+| Sync action | `src/features/canvas-sync/sync.ts` | Decrypts (audits), calls Canvas, upserts courses/sections/enrollments/assignments — one transaction PER entity type (Decision F3: partial success over total rollback). Errors to Sentry + Pino; `lastSyncedAt` bumped only on full success. |
 | Sync tests | `src/features/canvas-sync/sync.test.ts` | Mocked Canvas + real test DB. Asserts: full success bumps `lastSyncedAt`; partial failure rolls back the entire transaction; decrypt audit row is written every call. |
 | Canvas event taxonomy entries | `docs/observability/EVENTS.md` (additions: `canvas.sync.started`, `canvas.sync.succeeded`, `canvas.sync.failed`, `canvas.token.decrypted`, `canvas.token.encrypted`) | Catalog the events this feature emits |
 | Invite allowlist | `src/lib/auth/inviteAllowlist.ts` (reads from env or DB) | Source of "who can paste a token" |
@@ -377,7 +377,7 @@ Two options for integration tests:
 | `src/lib/audit/audit.ts` | Writes correct row; failure to write is logged + alerted but doesn't block the calling action (or does — decision below); sensitive fields redacted |
 | `src/lib/auth/callbacks.ts` | Sign-in writes `auth.session.created` audit; sign-out writes `auth.session.revoked`; expired session is rejected by middleware |
 | `src/lib/api/withApi.ts` | Unauthed → 401 + audit; rate-limited → 429; bad input → 400; success path passes parsed body to handler |
-| `src/features/canvas-sync/sync.ts` | Full sync succeeds; partial failure rolls back the entire transaction (no half-synced state); every decryption writes an audit row |
+| `src/features/canvas-sync/sync.ts` | Full sync succeeds and bumps `lastSyncedAt`; partial failure is tolerated (one transaction per entity type — a later type failing leaves earlier types committed and does NOT bump `lastSyncedAt`); every decryption writes an audit row. (Revised in Milestone F, Decision F3: per-entity-type transactions, partial success over total rollback.) |
 | `src/features/dashboard/queries.ts` | Returns only `session.user.id`'s data; forging a different `userId` in code path fails (RLS catches it) |
 | `src/lib/user/deleteUserCompletely.ts` | Cascade hits every related table; audit log retained per policy; idempotent |
 | `src/middleware.ts` | Public routes accessible without session; everything else 302s to `/login` |

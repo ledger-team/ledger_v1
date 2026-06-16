@@ -117,8 +117,9 @@ model School {
 }
 
 /// Encrypted Canvas API token, AES-256-GCM. Ciphertext format is
-/// "v2:<iv hex>:<tag hex>:<ciphertext hex>". The "v2:" version prefix is
-/// the fix for v1's lack of versioning — lets us rotate algorithms cleanly.
+/// "v2:<base64url(iv ‖ tag ‖ ciphertext)>" — a single base64url blob after the
+/// version prefix, as produced by src/lib/crypto/encryption.ts. The "v2:" prefix
+/// is the fix for v1's lack of versioning — lets us rotate algorithms cleanly.
 model CanvasToken {
   id             String    @id @default(cuid())
   userId         String    @unique

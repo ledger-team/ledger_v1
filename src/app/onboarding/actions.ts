@@ -3,9 +3,13 @@
 import { z } from 'zod'
 import { redirect } from 'next/navigation'
 import { requireUser } from '@/lib/auth/session'
+import { canPasteCanvasToken } from '@/lib/auth/inviteAllowlist'
 import { prisma } from '@/lib/db/prisma'
 import { audit } from '@/lib/audit/audit'
+import { logger } from '@/lib/log/logger'
 import { EVENTS } from '@/lib/analytics/events'
+import { saveToken } from '@/features/canvas-sync/token'
+import { syncUserCanvas } from '@/features/canvas-sync/sync'
 
 export type OnboardingState = { error?: string }
 
@@ -56,5 +60,24 @@ export async function completeOnboarding(
     metadata: { gradYear: parsed.data.gradYear },
   })
 
-  redirect('/dashboard')
+  // Optional Canvas connect (gated by the invite allowlist). Onboarding has
+  // already completed above, so any Canvas failure surfaces as a /dashboard
+  // banner rather than blocking the user (Decision F5). Sync runs inline (F4).
+  const rawToken = formData.get('canvasToken')
+  const canvasToken = typeof rawToken === 'string' ? rawToken.trim() : ''
+  let syncStatus: string | null = null
+  if (canvasToken && canPasteCanvasToken(session.user.email)) {
+    try {
+      await saveToken(session.user.id, canvasToken)
+      syncStatus = (await syncUserCanvas(session.user.id)).status
+    } catch (err) {
+      logger.error(
+        { event: EVENTS.canvas.sync_failed, userId: session.user.id, err: String(err) },
+        'canvas connect during onboarding threw',
+      )
+      syncStatus = 'error'
+    }
+  }
+
+  redirect(syncStatus ? `/dashboard?sync=${syncStatus}` : '/dashboard')
 }
