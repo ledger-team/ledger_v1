@@ -39,6 +39,9 @@ prisma/generated/
 .sentryclirc
 sentry.properties
 
+# Claude Code local state (memory, transcripts) — never commit
+.claude/
+
 # IDE
 .vscode/*
 !.vscode/extensions.json
