@@ -189,29 +189,32 @@ export async function syncUserCanvas(
     report(err, 'enrollments')
   }
 
-  // Assignments.
+  // Assignments — individual upserts, deliberately NOT wrapped in a single
+  // transaction. A course can have 50+ assignments, and one transaction holding
+  // that many writes can outlive the Supabase transaction-mode pooler's window
+  // ("Transaction not found ... old closed transaction"). Each service-role
+  // upsert is atomic on its own, so per-row writes are correct and put the least
+  // pressure on the pooler.
   try {
-    await prisma.$transaction(async (tx) => {
-      for (const [canvasCourseId, assignments] of assignmentsByCourse) {
-        const ourCourseId = courseIdByCanvas.get(canvasCourseId)
-        if (!ourCourseId) continue
-        for (const a of assignments) {
-          const data = {
-            name: a.name,
-            description: a.description ?? null,
-            dueAt: a.due_at ? new Date(a.due_at) : null,
-            pointsPossible: a.points_possible ?? null,
-            submissionType: a.submission_types?.[0] ?? null,
-          }
-          await tx.assignment.upsert({
-            where: { courseId_canvasId: { courseId: ourCourseId, canvasId: String(a.id) } },
-            create: { courseId: ourCourseId, canvasId: String(a.id), ...data },
-            update: data,
-          })
-          counts.assignments++
+    for (const [canvasCourseId, assignments] of assignmentsByCourse) {
+      const ourCourseId = courseIdByCanvas.get(canvasCourseId)
+      if (!ourCourseId) continue
+      for (const a of assignments) {
+        const data = {
+          name: a.name,
+          description: a.description ?? null,
+          dueAt: a.due_at ? new Date(a.due_at) : null,
+          pointsPossible: a.points_possible ?? null,
+          submissionType: a.submission_types?.[0] ?? null,
         }
+        await prisma.assignment.upsert({
+          where: { courseId_canvasId: { courseId: ourCourseId, canvasId: String(a.id) } },
+          create: { courseId: ourCourseId, canvasId: String(a.id), ...data },
+          update: data,
+        })
+        counts.assignments++
       }
-    })
+    }
   } catch (err) {
     failures.push('assignments')
     report(err, 'assignments')

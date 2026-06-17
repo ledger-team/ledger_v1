@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/db/prisma', () => ({
-  prisma: { user: { findUnique: vi.fn(), update: vi.fn() }, $transaction: vi.fn() },
+  prisma: {
+    user: { findUnique: vi.fn(), update: vi.fn() },
+    assignment: { upsert: vi.fn() },
+    $transaction: vi.fn(),
+  },
 }))
 vi.mock('./token', () => ({ getDecryptedToken: vi.fn() }))
 vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
@@ -25,7 +29,6 @@ function makeTx() {
       ),
     },
     enrollment: { upsert: vi.fn().mockResolvedValue({}) },
-    assignment: { upsert: vi.fn().mockResolvedValue({}) },
   }
 }
 
@@ -82,6 +85,7 @@ beforeEach(() => {
     school: { canvasUrl: 'https://dsisd.instructure.com' },
   } as never)
   vi.mocked(prisma.user.update).mockResolvedValue({} as never)
+  vi.mocked(prisma.assignment.upsert).mockResolvedValue({} as never)
   vi.mocked(getDecryptedToken).mockResolvedValue('canvas-token')
 })
 
@@ -98,7 +102,7 @@ describe('syncUserCanvas (service-role writes)', () => {
   })
 
   it('partial failure (assignments) keeps earlier types and does NOT bump lastSyncedAt', async () => {
-    tx.assignment.upsert.mockRejectedValue(new Error('db boom'))
+    vi.mocked(prisma.assignment.upsert).mockRejectedValue(new Error('db boom'))
     const res = await syncUserCanvas('u1', factoryFor(fakeClient()))
     expect(res.status).toBe('partial')
     expect(res.counts.courses).toBe(1)
