@@ -1,13 +1,40 @@
 @import 'tailwindcss';
 
+/* Class-based dark mode (next-themes sets class="dark" on <html>). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --color-brand: #b5ff3d;
+  /* Constant brand accents — identical in both modes. */
+  --color-accent: #b5ff3d; /* lime — wordmark, focus, grades >=90 */
+  --color-urgent: #ff6b6b; /* rose — due <24h */
+  --color-warn: #fbbf24; /* amber-400 — due <72h, grades 70-79 */
   --font-sans:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
+/* Mode-dependent semantic tokens. Defaults = light (secondary); .dark overrides. */
 :root {
-  color-scheme: dark;
+  --background: #fafaf7;
+  --surface: #ffffff;
+  --foreground: #0b0b0e;
+  --muted: #8c8c8e;
+}
+
+.dark {
+  --background: #0b0b0e;
+  --surface: #171719;
+  --foreground: #f2f2f0;
+  --muted: #8c8c8e;
+}
+
+/* Expose the mode-dependent tokens as Tailwind color utilities (bg-surface,
+   text-foreground, text-muted, border-background, …). `inline` makes the
+   utilities reference the CSS var, so they flip with the .dark class. */
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
 }
 
 html,
@@ -16,8 +43,8 @@ body {
 }
 
 body {
-  background: #0a0a0a;
-  color: #fafafa;
+  background: var(--background);
+  color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }

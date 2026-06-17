@@ -2,7 +2,7 @@
 
 *Living document. Updated as the foundation builds out. Source of truth for "what's actually working today."*
 
-*Last updated: 2026-06-16.*
+*Last updated: 2026-06-17.*
 
 ---
 
@@ -17,10 +17,10 @@
 | **A. Repo & tooling** | ✅ Done | Next 15 + React 19 + TS strict + Tailwind v4 + Vitest. PR #1. |
 | **B. Database foundation** | ✅ Done | Prisma 5 + Supabase + 16 tables with RLS on all of them. PR #2. Schema doc at `docs/db/SCHEMA.md`. |
 | **C. Observability** | ✅ Done | Pino (stdout NDJSON) + Sentry (no source maps) + PostHog (browser + server) + AuditLog helper. RLS isolation test (11 cases) ships here. Runbook at `docs/observability/RUNBOOK.md`. Sentry verified end-to-end 2026-06-15 (SDK-captured `smoke: sentry test` confirmed in dashboard); instrumentation/Sentry config files moved under `src/` so Next 15's hook actually loads. |
-| **D. Security primitives** | 🟡 In progress | AES-256-GCM encryption (`v2:` versioned format, AAD-ready, pure core) + `withApi` wrapper (auth + rate-limit + Zod, protected-by-default) + Upstash sliding-window limiter (dev fail-open / prod fail-closed) + HTTP security headers (CSP/HSTS/X-Frame-Options/etc) at `next.config.ts`. 28 new tests. PR open for review. |
-| **E. Authentication** | 🟡 In progress | NextAuth v4 (database sessions) + Resend magic-link + Prisma adapter. Default-deny middleware (cookie-presence gate). `/login` + `/login/check-email`, two-step `/onboarding` (school + gradYear + name; Canvas paste is a gated stub — saving lands in F), `/dashboard` placeholder showing real session data. `session.ts` internals swapped to NextAuth; `withApi` untouched. INVITE_ONLY gate. 15 new tests. PR open for review. |
-| **F. Canvas sync** | 🟡 In progress | Typed Canvas client (`canvas.ts`, Link pagination, 401-distinct errors) + token storage (`token.ts`, D-module `v2:` base64url, AAD=userId, audited decrypts) + `syncUserCanvas` (`sync.ts`, withSession/RLS, one tx per entity type, `lastSyncedAt` on full success only). Onboarding token-paste now real (encrypt→store→sync inline→dashboard banner). Schema/SCHEMA.md ciphertext comments corrected. 16 new tests. PR open for review. |
-| **G. Dashboard feature** | ⬜ Not started | First plug-and-play feature folder |
+| **D. Security primitives** | ✅ Done | AES-256-GCM encryption (`v2:` versioned format, AAD-ready, pure core) + `withApi` wrapper (auth + rate-limit + Zod, protected-by-default) + Upstash sliding-window limiter (dev fail-open / prod fail-closed) + HTTP security headers (CSP/HSTS/X-Frame-Options/etc) at `next.config.ts`. 28 tests. PR #4. |
+| **E. Authentication** | ✅ Done | NextAuth v4 (database sessions) + Resend magic-link + Prisma adapter. Default-deny middleware (cookie-presence gate). `/login` + `/login/check-email`, two-step `/onboarding` (school + gradYear + name). `session.ts` internals swapped to NextAuth; `withApi` untouched. INVITE_ONLY gate. 15 tests. PR #5. |
+| **F. Canvas sync** | ✅ Done | Typed Canvas client (`canvas.ts`, Link pagination, 401-distinct errors) + token storage (`token.ts`, D-module `v2:` base64url, AAD=userId, audited decrypts) + `syncUserCanvas`. Verified end-to-end against real DSISD Canvas (4 courses, 9 sections, 4 enrollments, 137 assignments). Sync writes use the **service-role** client (RLS-as-sync-write-path tracked as a follow-up); non-sync paths stay on `withSession`/RLS. Assignments upserted individually (pooler tx-timeout). 16 tests. PR #6. |
+| **G. Dashboard feature** | 🟡 In progress | First plug-and-play feature folder (`src/features/dashboard/`). Upcoming assignments ("Next 7 days" / "Coming up") + per-course grades, mobile-first 390px, dark-mode-primary via next-themes + CSS brand tokens. Urgency cues (rose <24h / amber <72h) + grade colors. Study-guide button stub (Phase 1 = one-line swap). Reads via `withSession` (RLS isolation). 9 tests. PR open for review. |
 | **H. FERPA delete** | ⬜ Not started | `deleteUserCompletely` + UI |
 | **I. Testing & CI** | ⬜ Not started | GitHub Actions: lint + typecheck + tests |
 | **J. Production cutover** | ⬜ Not started | Vercel deploy + Supabase Pro + Better Stack uptime |
