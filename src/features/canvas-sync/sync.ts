@@ -1,14 +1,28 @@
 // Canvas → database sync for one user.
 //
-// Runs under withSession (RLS-enforced, Decision F2): the policies in migration
-// 0002 were written for exactly this path (course/section/assignment inserts are
-// gated on current_school_id, enrollments on current_user_id).
+// Writes run under withSession (RLS-enforced, Decision F2): the WITH CHECK
+// policies in migration 0002 confirm a sync can only write within the user's own
+// school (course/section/assignment) and own enrollments.
 //
-// Partial failure model (Decision F3): each entity type is persisted in its own
-// transaction. A later type failing leaves earlier types committed —
-// partial success beats total rollback. `User.lastSyncedAt` is the
-// "fully-consistent" marker and is only set when every phase succeeds.
+// RLS caveat (found + measured in F live verification): Course/Section/Assignment
+// SELECT is enrollment-gated, and during sync the row has no enrollment yet, so:
+//   - Prisma create/upsert use INSERT ... RETURNING; Postgres applies the SELECT
+//     policy to RETURNING rows → the just-written row is invisible → error.
+//   - INSERT ... ON CONFLICT (even DO NOTHING) also requires the SELECT policy to
+//     read the conflict arbiter → same 42501 failure.
+//   - But a plain INSERT (WITH CHECK only) and an UPDATE ... WHERE (USING only)
+//     both succeed.
+// Fix (Decision: "raw writes + service-role id read-back"): upsert those three via
+// raw UPDATE-then-INSERT-if-missing (no ON CONFLICT, no RETURNING), then read the
+// surrogate ids back with the service-role client for FK mapping. Enrollments are
+// user-scoped (enrollment_select = current_user_id), so their row is visible after
+// write — those stay ordinary Prisma upserts.
+//
+// Partial failure model (Decision F3): one transaction per entity type. A later
+// type failing leaves earlier types committed; User.lastSyncedAt is set only when
+// every phase succeeds.
 
+import { randomUUID } from 'node:crypto'
 import * as Sentry from '@sentry/nextjs'
 import { prisma } from '@/lib/db/prisma'
 import { withSession, type SessionClaims } from '@/lib/db/withSession'
@@ -31,6 +45,10 @@ export type SyncCounts = { courses: number; sections: number; enrollments: numbe
 export type SyncResult = { status: SyncStatus; counts: SyncCounts }
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
+function studentGrade(c: CanvasCourse) {
+  return c.enrollments?.find((e) => e.type?.toLowerCase().includes('student')) ?? c.enrollments?.[0]
+}
 
 export async function syncUserCanvas(
   userId: string,
@@ -95,34 +113,48 @@ export async function syncUserCanvas(
 
   // ---- Persist phase: one transaction per entity type ----
   const failures: string[] = []
-  const courseIdByCanvas = new Map<number, string>()
-  const sectionIdByCanvas = new Map<number, string>()
+  // canvasCanvasId(string) -> our surrogate id
+  const courseIdByCanvas = new Map<string, string>()
+  const sectionIdByCanvas = new Map<string, string>()
 
-  // Courses (+ stamp canvasUserId on the user).
+  // Courses (+ stamp canvasUserId on the user; the user's own row is visible to
+  // itself, so that one stays an ordinary Prisma update).
   try {
     await withSession(claims, async (tx) => {
       await tx.user.update({ where: { id: userId }, data: { canvasUserId } })
       for (const c of courses) {
-        const g =
-          c.enrollments?.find((e) => e.type?.toLowerCase().includes('student')) ?? c.enrollments?.[0]
-        const data = {
-          name: c.name,
-          courseCode: c.course_code,
-          currentGrade: g?.computed_current_grade ?? null,
-          currentScore: g?.computed_current_score ?? null,
-          finalGrade: g?.computed_final_grade ?? null,
-          finalScore: g?.computed_final_score ?? null,
-          lastSyncedAt: new Date(),
+        const g = studentGrade(c)
+        const updated = await tx.$executeRaw`
+          UPDATE "Course" SET
+            "name" = ${c.name}, "courseCode" = ${c.course_code},
+            "currentGrade" = ${g?.computed_current_grade ?? null},
+            "currentScore" = ${g?.computed_current_score ?? null},
+            "finalGrade" = ${g?.computed_final_grade ?? null},
+            "finalScore" = ${g?.computed_final_score ?? null},
+            "lastSyncedAt" = now(), "updatedAt" = now()
+          WHERE "schoolId" = ${schoolId} AND "canvasCourseId" = ${String(c.id)}
+        `
+        if (updated === 0) {
+          await tx.$executeRaw`
+            INSERT INTO "Course"
+              ("id","schoolId","canvasCourseId","name","courseCode",
+               "currentGrade","currentScore","finalGrade","finalScore",
+               "lastSyncedAt","createdAt","updatedAt")
+            VALUES
+              (${randomUUID()}, ${schoolId}, ${String(c.id)}, ${c.name}, ${c.course_code},
+               ${g?.computed_current_grade ?? null}, ${g?.computed_current_score ?? null},
+               ${g?.computed_final_grade ?? null}, ${g?.computed_final_score ?? null},
+               now(), now(), now())
+          `
         }
-        const row = await tx.course.upsert({
-          where: { schoolId_canvasCourseId: { schoolId, canvasCourseId: String(c.id) } },
-          create: { schoolId, canvasCourseId: String(c.id), ...data },
-          update: data,
-          select: { id: true },
-        })
-        courseIdByCanvas.set(c.id, row.id)
       }
     })
+    // Read ids back (service role — bypasses the enrollment-gated SELECT policy).
+    const rows = await prisma.course.findMany({
+      where: { schoolId, canvasCourseId: { in: courses.map((c) => String(c.id)) } },
+      select: { id: true, canvasCourseId: true },
+    })
+    for (const r of rows) courseIdByCanvas.set(r.canvasCourseId, r.id)
     counts.courses = courses.length
   } catch (err) {
     return fail('error', err) // nothing downstream can map without course ids
@@ -132,30 +164,39 @@ export async function syncUserCanvas(
   try {
     await withSession(claims, async (tx) => {
       for (const [canvasCourseId, sections] of sectionsByCourse) {
-        const ourCourseId = courseIdByCanvas.get(canvasCourseId)
+        const ourCourseId = courseIdByCanvas.get(String(canvasCourseId))
         if (!ourCourseId) continue
         for (const s of sections) {
-          const row = await tx.section.upsert({
-            where: { courseId_canvasSectionId: { courseId: ourCourseId, canvasSectionId: String(s.id) } },
-            create: { courseId: ourCourseId, canvasSectionId: String(s.id), name: s.name },
-            update: { name: s.name },
-            select: { id: true },
-          })
-          sectionIdByCanvas.set(s.id, row.id)
+          const updated = await tx.$executeRaw`
+            UPDATE "Section" SET "name" = ${s.name}, "updatedAt" = now()
+            WHERE "courseId" = ${ourCourseId} AND "canvasSectionId" = ${String(s.id)}
+          `
+          if (updated === 0) {
+            await tx.$executeRaw`
+              INSERT INTO "Section" ("id","courseId","canvasSectionId","name","createdAt","updatedAt")
+              VALUES (${randomUUID()}, ${ourCourseId}, ${String(s.id)}, ${s.name}, now(), now())
+            `
+          }
           counts.sections++
         }
       }
     })
+    const canvasSectionIds = [...sectionsByCourse.values()].flat().map((s) => String(s.id))
+    const rows = await prisma.section.findMany({
+      where: { course: { schoolId }, canvasSectionId: { in: canvasSectionIds } },
+      select: { id: true, canvasSectionId: true },
+    })
+    for (const r of rows) sectionIdByCanvas.set(r.canvasSectionId, r.id)
   } catch (err) {
     failures.push('sections')
     report(err, 'sections')
   }
 
-  // Enrollments (the user's own section memberships).
+  // Enrollments (user-scoped → the new row is visible to its owner, so plain Prisma).
   try {
     await withSession(claims, async (tx) => {
       for (const e of selfEnrollments) {
-        const ourSectionId = sectionIdByCanvas.get(e.course_section_id)
+        const ourSectionId = sectionIdByCanvas.get(String(e.course_section_id))
         if (!ourSectionId) continue
         await tx.enrollment.upsert({
           where: { userId_sectionId: { userId, sectionId: ourSectionId } },
@@ -170,25 +211,32 @@ export async function syncUserCanvas(
     report(err, 'enrollments')
   }
 
-  // Assignments.
+  // Assignments (no read-back needed).
   try {
     await withSession(claims, async (tx) => {
       for (const [canvasCourseId, assignments] of assignmentsByCourse) {
-        const ourCourseId = courseIdByCanvas.get(canvasCourseId)
+        const ourCourseId = courseIdByCanvas.get(String(canvasCourseId))
         if (!ourCourseId) continue
         for (const a of assignments) {
-          const data = {
-            name: a.name,
-            description: a.description ?? null,
-            dueAt: a.due_at ? new Date(a.due_at) : null,
-            pointsPossible: a.points_possible ?? null,
-            submissionType: a.submission_types?.[0] ?? null,
+          const dueAt = a.due_at ? new Date(a.due_at) : null
+          const submissionType = a.submission_types?.[0] ?? null
+          const updated = await tx.$executeRaw`
+            UPDATE "Assignment" SET
+              "name" = ${a.name}, "description" = ${a.description ?? null}, "dueAt" = ${dueAt},
+              "pointsPossible" = ${a.points_possible ?? null}, "submissionType" = ${submissionType},
+              "updatedAt" = now()
+            WHERE "courseId" = ${ourCourseId} AND "canvasId" = ${String(a.id)}
+          `
+          if (updated === 0) {
+            await tx.$executeRaw`
+              INSERT INTO "Assignment"
+                ("id","courseId","canvasId","name","description","dueAt",
+                 "pointsPossible","submissionType","isTestData","createdAt","updatedAt")
+              VALUES
+                (${randomUUID()}, ${ourCourseId}, ${String(a.id)}, ${a.name}, ${a.description ?? null},
+                 ${dueAt}, ${a.points_possible ?? null}, ${submissionType}, false, now(), now())
+            `
           }
-          await tx.assignment.upsert({
-            where: { courseId_canvasId: { courseId: ourCourseId, canvasId: String(a.id) } },
-            create: { courseId: ourCourseId, canvasId: String(a.id), ...data },
-            update: data,
-          })
           counts.assignments++
         }
       }
@@ -203,10 +251,7 @@ export async function syncUserCanvas(
     await withSession(claims, async (tx) => {
       await tx.user.update({ where: { id: userId }, data: { lastSyncedAt: new Date() } })
     })
-    logger.info(
-      { event: EVENTS.canvas.sync_succeeded, userId, ...counts },
-      'canvas sync succeeded',
-    )
+    logger.info({ event: EVENTS.canvas.sync_succeeded, userId, ...counts }, 'canvas sync succeeded')
     return { status: 'ok', counts }
   }
 
