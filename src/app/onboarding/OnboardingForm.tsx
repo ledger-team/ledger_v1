@@ -87,27 +87,15 @@ export function OnboardingForm({
           {canPasteToken ? (
             <div className="mt-2 flex flex-col gap-2">
               <p className="text-sm text-gray-500">
-                Paste your Canvas access token to sync your courses.
+                Paste your Canvas access token to sync your courses (optional — you can
+                finish without it). It&apos;s encrypted before it&apos;s stored.
               </p>
               <textarea
+                name="canvasToken"
                 rows={3}
                 placeholder="Canvas access token"
                 className="rounded-md border border-gray-300 px-3 py-2 text-sm"
               />
-              {/*
-                Token saving (encrypt → store → sync) is Milestone F, not E. This
-                button is intentionally a no-op for now. When F wires it up, the
-                CanvasToken ciphertext MUST use the Milestone D module format,
-                `v2:<base64url(iv‖tag‖ciphertext)>` — NOT the stale hex format in
-                the CanvasToken schema comment. See memory/F notes.
-              */}
-              <button
-                type="button"
-                onClick={() => alert('Canvas connect activates next release.')}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium"
-              >
-                Connect (activates next release)
-              </button>
             </div>
           ) : (
             <div className="mt-2 rounded-md bg-gray-50 p-3">

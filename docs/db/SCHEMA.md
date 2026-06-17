@@ -40,7 +40,7 @@ NextAuth's `Account` table has columns named `refresh_token`, `access_token`, an
 **When Canvas OAuth ships in a future milestone, Canvas tokens MUST NOT be persisted to those columns.** Canvas tokens give full access to a student's real academic record. They are the most sensitive data Ledger holds. They must:
 
 1. Be encrypted with AES-256-GCM via `encrypt()` in `src/lib/crypto/encryption.ts` (Milestone D).
-2. Live in the dedicated `CanvasToken` table where the ciphertext column is named `encryptedToken` and the format is `v2:<iv>:<tag>:<ciphertext>`.
+2. Live in the dedicated `CanvasToken` table where the ciphertext column is named `encryptedToken` and the format is `v2:<base64url(iv ‖ tag ‖ ciphertext)>` (a single base64url blob after the version prefix, as produced by `src/lib/crypto/encryption.ts`).
 3. Be decrypted only at use time, and every decryption writes an `AuditLog` row.
 
 The NextAuth adapter's default behavior would happily persist the OAuth response straight into `Account.refresh_token` unencrypted. **The Canvas provider must override this.** The pattern (for the agent who builds OAuth):
