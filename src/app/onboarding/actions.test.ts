@@ -48,13 +48,13 @@ describe('completeOnboarding', () => {
     expect(mockedPrisma.user.update).not.toHaveBeenCalled()
   })
 
-  it('persists, audits, and redirects to /dashboard on success', async () => {
+  it('persists, audits, and redirects to /home on success', async () => {
     mockedPrisma.school.findFirst.mockResolvedValue({ id: 's1' })
     mockedPrisma.user.update.mockResolvedValue({})
 
     await expect(
       completeOnboarding({}, form({ name: 'Sam Berry', schoolId: 's1', gradYear: '2027' })),
-    ).rejects.toThrow('REDIRECT:/dashboard')
+    ).rejects.toThrow('REDIRECT:/home')
 
     expect(mockedPrisma.user.update).toHaveBeenCalledWith(
       expect.objectContaining({

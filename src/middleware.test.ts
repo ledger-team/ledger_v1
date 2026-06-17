@@ -21,13 +21,13 @@ describe('default-deny middleware', () => {
   })
 
   it('redirects a protected route to /login when no session cookie is present', () => {
-    const res = middleware(reqFor('/dashboard'))
+    const res = middleware(reqFor('/home'))
     expect(res.status).toBe(307)
     expect(res.headers.get('location')).toContain('/login')
     expect(res.headers.get('location')).toContain('callbackUrl')
   })
 
   it('lets a protected route through when a session cookie is present', () => {
-    expect(middleware(reqFor('/dashboard', true)).headers.get('location')).toBeNull()
+    expect(middleware(reqFor('/home', true)).headers.get('location')).toBeNull()
   })
 })

@@ -7,7 +7,7 @@ import { ThemeProvider as NextThemesProvider } from 'next-themes'
 // suppressHydrationWarning on <html> in the root layout).
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return (
-    <NextThemesProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
+    <NextThemesProvider attribute="class" defaultTheme="dark" enableSystem={false}>
       {children}
     </NextThemesProvider>
   )

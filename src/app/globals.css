@@ -5,9 +5,19 @@
 
 @theme {
   /* Constant brand accents — identical in both modes. */
-  --color-accent: #b5ff3d; /* lime — wordmark, focus, grades >=90 */
-  --color-urgent: #ff6b6b; /* rose — due <24h */
+  --color-accent: #b5ff3d; /* lime — wordmark, focus, grades >=90, active nav */
+  --color-urgent: #ff6b6b; /* rose — due <24h, grades <70 */
   --color-warn: #fbbf24; /* amber-400 — due <72h, grades 70-79 */
+
+  /* Course-dot palette (constant both modes; avoids lime/amber/rose). */
+  --color-course-1: #6ea8fe; /* blue */
+  --color-course-2: #f4a261; /* orange */
+  --color-course-3: #a78bfa; /* violet */
+  --color-course-4: #2dd4bf; /* teal */
+  --color-course-5: #f472b6; /* pink */
+  --color-course-6: #818cf8; /* indigo */
+  --color-course-7: #22d3ee; /* cyan */
+
   --font-sans:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
@@ -16,23 +26,25 @@
 :root {
   --background: #fafaf7;
   --surface: #ffffff;
+  --surface-raised: #ffffff;
   --foreground: #0b0b0e;
   --muted: #8c8c8e;
 }
 
 .dark {
   --background: #0b0b0e;
-  --surface: #171719;
+  --surface: #1e1e21; /* lifted off the #0B0B0E background */
+  --surface-raised: #26262a; /* nav bar / pills — one step higher */
   --foreground: #f2f2f0;
   --muted: #8c8c8e;
 }
 
-/* Expose the mode-dependent tokens as Tailwind color utilities (bg-surface,
-   text-foreground, text-muted, border-background, …). `inline` makes the
-   utilities reference the CSS var, so they flip with the .dark class. */
+/* Expose mode-dependent tokens as Tailwind utilities (bg-surface, text-muted, …)
+   that flip with the .dark class. */
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
 }
@@ -47,4 +59,15 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* ~200ms theme color transition (G2). Disabled under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  body,
+  [data-theme-transition] {
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease,
+      border-color 0.2s ease;
+  }
 }

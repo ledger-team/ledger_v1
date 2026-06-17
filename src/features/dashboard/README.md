@@ -13,8 +13,9 @@ logged-in student their upcoming Canvas assignments and course grades.
 | `components/` | `DashboardView` (server, composes), `CourseGrades` (server), `AssignmentCard` (server), `StudyGuideButton` (client). |
 | `*.test.ts` | urgency classification (unit), stub action (unit), query isolation (integration). |
 
-The Next route `src/app/dashboard/page.tsx` is a thin server component that
-resolves the session, calls `getDashboardData`, and renders `DashboardView`.
+The Next route `src/app/(app)/home/page.tsx` is a thin server component that
+resolves the session, calls `getDashboardData`, and renders `HomeView`. It lives
+inside the `(app)` route group, which provides the persistent nav shell (G2).
 
 ## Conventions (PHASE_0_PLAN §6)
 

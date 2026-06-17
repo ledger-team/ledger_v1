@@ -15,7 +15,9 @@ export function StudyGuideButton({ assignmentId }: { assignmentId: string }) {
         onClick={() =>
           startTransition(async () => setResult(await generateStudyGuide(assignmentId)))
         }
-        className="flex h-11 w-full items-center justify-center rounded-lg border border-accent/40 px-4 text-sm font-medium text-accent hover:bg-accent/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+        className={`flex h-11 w-full items-center justify-center rounded-lg border border-accent/40 px-4 text-sm font-medium text-accent transition-transform hover:bg-accent/10 active:scale-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60 ${
+          pending ? 'animate-pulse motion-reduce:animate-none' : ''
+        }`}
       >
         {pending ? 'Generating…' : 'Generate study guide'}
       </button>

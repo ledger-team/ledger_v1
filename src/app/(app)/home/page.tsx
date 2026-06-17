@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/db/prisma'
 import { getDashboardData } from '@/features/dashboard/queries'
-import { DashboardView } from '@/features/dashboard/components/DashboardView'
+import { pickGreeting } from '@/features/dashboard/greeting'
+import { HomeView } from '@/features/dashboard/components/HomeView'
 
 const SYNC_BANNERS: Record<string, string> = {
   auth_error: 'Canvas rejected your token. Reconnect Canvas to sync your courses.',
@@ -12,14 +13,13 @@ const SYNC_BANNERS: Record<string, string> = {
   error: 'Canvas sync didn’t complete.',
 }
 
-export default async function DashboardPage({
+export default async function HomePage({
   searchParams,
 }: {
   searchParams: Promise<{ sync?: string }>
 }) {
   const session = await getServerSession()
   if (!session) redirect('/login')
-  if (!session.user.onboarded) redirect('/onboarding')
 
   const [school, data] = await Promise.all([
     session.user.schoolId
@@ -33,8 +33,8 @@ export default async function DashboardPage({
   const sync = (await searchParams).sync
 
   return (
-    <DashboardView
-      name={firstName}
+    <HomeView
+      greeting={pickGreeting(firstName)}
       schoolName={school?.name ?? null}
       data={data}
       syncBanner={sync ? (SYNC_BANNERS[sync] ?? null) : null}
