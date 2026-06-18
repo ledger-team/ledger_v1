@@ -7,7 +7,7 @@ import { OnboardingForm } from './OnboardingForm'
 export default async function OnboardingPage() {
   const session = await getServerSession()
   if (!session) redirect('/login')
-  if (session.user.onboarded) redirect('/dashboard')
+  if (session.user.onboarded) redirect('/home')
 
   const schools = await prisma.school.findMany({
     where: { isActive: true },

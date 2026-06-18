@@ -14,7 +14,7 @@ export default function LoginPage() {
     e.preventDefault()
     setPending(true)
     setError('')
-    const res = await signIn('email', { email, redirect: false, callbackUrl: '/onboarding' })
+    const res = await signIn('email', { email, redirect: false, callbackUrl: '/home' })
     setPending(false)
     if (res?.error) {
       setError('Could not send the magic link. Check the address and try again.')

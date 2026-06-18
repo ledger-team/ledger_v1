@@ -61,8 +61,8 @@ export async function completeOnboarding(
   })
 
   // Optional Canvas connect (gated by the invite allowlist). Onboarding has
-  // already completed above, so any Canvas failure surfaces as a /dashboard
-  // banner rather than blocking the user (Decision F5). Sync runs inline (F4).
+  // already completed above, so any Canvas failure surfaces as a /home banner
+  // rather than blocking the user (Decision F5). Sync runs inline (F4).
   const rawToken = formData.get('canvasToken')
   const canvasToken = typeof rawToken === 'string' ? rawToken.trim() : ''
   let syncStatus: string | null = null
@@ -79,5 +79,5 @@ export async function completeOnboarding(
     }
   }
 
-  redirect(syncStatus ? `/dashboard?sync=${syncStatus}` : '/dashboard')
+  redirect(syncStatus ? `/home?sync=${syncStatus}` : '/home')
 }

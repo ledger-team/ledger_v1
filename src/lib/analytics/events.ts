@@ -32,6 +32,7 @@ export const EVENTS = {
   dashboard: {
     // Emitted from Milestone G onward.
     viewed: 'dashboard.viewed',
+    study_guide_requested: 'dashboard.study_guide.requested',
   },
   onboarding: {
     // Emitted from Milestone E onward.
