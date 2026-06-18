@@ -17,8 +17,13 @@ import { audit } from '@/lib/audit/audit'
 import { logger } from '@/lib/log/logger'
 import { EVENTS } from '@/lib/analytics/events'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'
+
+// Construct Resend lazily, NOT at module load: the Resend ctor throws on a
+// missing key, and this module is imported (via session.ts → getServerSession)
+// by every authed route, so a top-level `new Resend()` breaks `next build` when
+// RESEND_API_KEY isn't present at build time. Deferring to send time keeps the
+// build env-free while behavior at runtime is unchanged.
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -34,6 +39,7 @@ export const authOptions: NextAuthOptions = {
       from: FROM,
       maxAge: 10 * 60, // magic links expire in 10 minutes
       async sendVerificationRequest({ identifier, url }) {
+        const resend = new Resend(process.env.RESEND_API_KEY)
         await resend.emails.send({
           from: FROM,
           to: identifier,
