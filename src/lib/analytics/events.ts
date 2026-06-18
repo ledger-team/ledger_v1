@@ -43,6 +43,10 @@ export const EVENTS = {
     posthog: 'smoke.posthog.test',
     sentry: 'smoke.sentry.thrown',
   },
+  user: {
+    // Emitted from Milestone H onward.
+    deleted: 'user.deleted',
+  },
 } as const
 
 type AllEvents<T> = T extends string

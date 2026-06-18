@@ -269,10 +269,10 @@ This is the concrete file-by-file list. Paths assume the conventional Next 15 Ap
 
 | Deliverable | Path | Purpose |
 | --- | --- | --- |
-| Delete function | `src/lib/user/deleteUserCompletely.ts` | Single transaction. Cascade: tokens, enrollments, posts, study guides, sessions, accounts. AuditLog rows about the user are **retained** (the audit log survives the user) but the `actorUserId` is replaced with `<deleted-user-XXXX>` to break PII linkage while keeping the audit trail. |
-| Delete API endpoint | `src/app/api/account/delete/route.ts` | Requires double confirmation (current session + a fresh token from a confirmation email) |
-| Delete UI | `src/app/settings/account/page.tsx` (Delete Account section) | Behind a confirmation modal |
-| Delete tests | `src/lib/user/deleteUserCompletely.test.ts` | Cascade works for every related table; audit log is preserved per policy above; idempotent on retry |
+| Delete function | `src/lib/user/deleteUserCompletely.ts` | Service-role. Audit `user.deleted` written first, then FK cascades remove tokens, enrollments, posts, study guides, sessions, accounts (+ VerificationToken by email, which has no FK). AuditLog rows about the user are **retained** — `actorUserId` is **SET NULL** (per the schema cascade map), with `actorEmailHash` keeping a non-reversible link. Idempotent. (Revised in H: SET NULL, not a `<deleted-user-XXXX>` sentinel.) |
+| Delete action | `src/app/(app)/you/actions.ts` (`deleteAccount`) | Server action; only ever deletes `session.user.id` (the authorization boundary). No email re-confirmation — confirmation is a client dialog (revised in H from the original double-confirm-email idea). |
+| Delete UI | `src/components/DeleteAccountButton.tsx` (on the You page) | Accessible native `<dialog>`: Escape cancels, focus defaults to **Cancel** (destructive Delete requires a deliberate Tab/click). Confirm → action → `signOut` → `/login`. |
+| Delete tests | `src/lib/user/deleteUserCompletely.test.ts` (+ `.integration.test.ts`) | Unit (mocked): audit-before-delete, correct ids, idempotent. Integration (real DB): user + cascades gone, AuditLog row has `actorUserId = null`. |
 
 ### Milestone I — Testing & CI
 
