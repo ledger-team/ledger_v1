@@ -15,9 +15,10 @@ describe('default-deny middleware', () => {
     expect(middleware(reqFor('/')).headers.get('location')).toBeNull()
   })
 
-  it('treats /api/auth and /api/smoke as public', () => {
+  it('treats /api/auth, /api/smoke, and /api/health as public', () => {
     expect(middleware(reqFor('/api/auth/session')).headers.get('location')).toBeNull()
     expect(middleware(reqFor('/api/smoke/sentry')).headers.get('location')).toBeNull()
+    expect(middleware(reqFor('/api/health')).headers.get('location')).toBeNull()
   })
 
   it('redirects a protected route to /login when no session cookie is present', () => {

@@ -43,9 +43,11 @@ const nextConfig: NextConfig = {
 export default withSentryConfig(nextConfig, {
   // Suppress Sentry build-time chatter — we want errors visible but not chatter.
   silent: true,
-  // Source map upload deferred to Milestone J (production cutover). In dev
-  // we have the TypeScript open; in Phase 0 prod doesn't exist yet.
-  sourcemaps: { disable: true },
+  // Source maps (enabled in Milestone J). Upload only actually fires when
+  // SENTRY_AUTH_TOKEN (+ org/project) are present — i.e. the Vercel production
+  // build. CI/local without the token skip silently. The Sentry plugin deletes
+  // the uploaded maps from the build output so they're never served publicly.
+  sourcemaps: { disable: false },
   // Other Sentry features (release notes, deploy markers, etc.) wire up in J.
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
