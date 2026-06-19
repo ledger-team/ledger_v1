@@ -13,6 +13,7 @@ function isPublic(pathname: string): boolean {
   if (pathname === '/login' || pathname.startsWith('/login/')) return true
   if (pathname.startsWith('/api/auth')) return true
   if (pathname.startsWith('/api/smoke')) return true // dev-only routes; they self-404 in prod
+  if (pathname.startsWith('/api/health')) return true // uptime probe
   return false
 }
 

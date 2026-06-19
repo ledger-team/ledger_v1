@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useState } from 'react'
+import { LedgerLoader } from '@/components/LedgerLoader'
 import { completeOnboarding, type OnboardingState } from './actions'
 
 type School = { id: string; name: string }
@@ -19,6 +20,11 @@ export function OnboardingForm({
     completeOnboarding,
     {},
   )
+
+  // While the submit runs, completeOnboarding does saveToken + syncUserCanvas
+  // inline (15-40s) before redirecting — so `pending` IS the sync wait. Show the
+  // branded loader in place of the form instead of a frozen button.
+  if (pending) return <LedgerLoader label="Syncing your courses…" />
 
   // Both steps stay mounted (step 2 hides step 1 via CSS) so all fields are in
   // the FormData when the final submit fires.
