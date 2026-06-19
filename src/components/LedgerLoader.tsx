@@ -3,12 +3,14 @@
 /**
  * LedgerLoader — animated "ledger" wordmark for loading states.
  *
- * Used during Canvas sync (~15-40s) so the user sees branded motion
- * instead of a blank screen. Transparent background — inherits whatever
- * surface it sits on (dark #0B0B0E or light #FAFAF7). Lime stays constant.
+ * Used during Canvas sync (~15-40s) so the user sees branded motion instead of
+ * a blank screen. Transparent background — inherits whatever surface it sits on
+ * (dark #0B0B0E or light #FAFAF7). Lime stays constant.
  *
- * Honors prefers-reduced-motion: animation is disabled, wordmark renders
- * static at full opacity.
+ * Layout is flexbox per-letter spans — NOT absolute SVG x-coordinates — so it
+ * never goes lopsided across fonts / font-load timing / environments.
+ *
+ * Honors prefers-reduced-motion: animation off, wordmark static at full opacity.
  *
  * Usage:
  *   {syncing ? <LedgerLoader label="Syncing your courses…" /> : <Dashboard />}
@@ -17,16 +19,13 @@
 type LedgerLoaderProps = {
   /** Optional caption shown beneath the wordmark. */
   label?: string
-  /** Pixel size of the wordmark text. Default 64. */
+  /** Font size (px) of the wordmark letters. Default 56. */
   size?: number
 }
 
 const LETTERS = ['l', 'e', 'd', 'g', 'e', 'r']
 
-// Per-letter x positions tuned for the default 64px weight-800 wordmark.
-const X = [40, 68, 108, 150, 192, 232]
-
-export function LedgerLoader({ label, size = 64 }: LedgerLoaderProps) {
+export function LedgerLoader({ label, size = 56 }: LedgerLoaderProps) {
   return (
     <div
       role="status"
@@ -40,41 +39,34 @@ export function LedgerLoader({ label, size = 64 }: LedgerLoaderProps) {
         minHeight: '60vh',
       }}
     >
-      <svg
-        width={320}
-        viewBox="0 0 320 120"
-        role="img"
-        aria-label={label ?? 'Loading'}
-        style={{ maxWidth: '80vw' }}
-      >
+      <div role="img" aria-label={label ?? 'Loading'} style={{ display: 'flex' }}>
         {LETTERS.map((char, i) => (
-          <text
+          <span
             key={i}
-            x={X[i]}
-            y={80}
             className="ledger-loader-char"
             style={{ animationDelay: `${i * 0.12}s`, fontSize: size }}
           >
             {char}
-          </text>
+          </span>
         ))}
-      </svg>
+      </div>
 
       {label && <p className="ledger-loader-label">{label}</p>}
 
       <style>{`
         @keyframes ledgerLoaderWave {
-          0%, 60%, 100% { opacity: 0.25; transform: translateY(0px); }
+          0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
           30% { opacity: 1; transform: translateY(-6px); }
         }
         .ledger-loader-char {
+          display: inline-block;
           font-family: var(--font-sans, -apple-system, BlinkMacSystemFont,
             'Segoe UI', Roboto, sans-serif);
           font-weight: 800;
-          fill: #B5FF3D;
+          line-height: 1;
+          letter-spacing: -0.01em;
+          color: #B5FF3D;
           animation: ledgerLoaderWave 1.6s ease-in-out infinite;
-          transform-box: fill-box;
-          transform-origin: center;
         }
         .ledger-loader-label {
           font-size: 14px;
