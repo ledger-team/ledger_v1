@@ -13,6 +13,7 @@ describe('default-deny middleware', () => {
   it('lets public routes through without a session', () => {
     expect(middleware(reqFor('/login')).headers.get('location')).toBeNull()
     expect(middleware(reqFor('/')).headers.get('location')).toBeNull()
+    expect(middleware(reqFor('/privacy')).headers.get('location')).toBeNull()
   })
 
   it('treats /api/auth, /api/smoke, and /api/health as public', () => {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useState } from 'react'
+import Link from 'next/link'
 import { LedgerLoader } from '@/components/LedgerLoader'
 import { completeOnboarding, type OnboardingState } from './actions'
 
@@ -91,11 +92,28 @@ export function OnboardingForm({
         <div>
           <h2 className="text-sm font-medium">Connect Canvas</h2>
           {canPasteToken ? (
-            <div className="mt-2 flex flex-col gap-2">
-              <p className="text-sm text-gray-500">
-                Paste your Canvas access token to sync your courses (optional — you can
-                finish without it). It&apos;s encrypted before it&apos;s stored.
+            <div className="mt-2 flex flex-col gap-3">
+              <p className="text-sm text-muted">
+                Paste your Canvas access token to sync your courses. This is optional, you can
+                finish without it.
               </p>
+              {/* The token-paste step is where people hesitate. Answer the question
+                  they're actually asking, right here, before they have to ask it.
+                  Opens in a new tab so the half-filled form isn't lost. */}
+              <div className="rounded-md border border-accent/30 bg-accent/5 p-3">
+                <p className="text-sm">
+                  Your token is encrypted the second it reaches the server. No teacher, parent, or
+                  admin can ever see it.
+                </p>
+                <Link
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 inline-block text-sm font-medium text-accent hover:underline"
+                >
+                  How it works →
+                </Link>
+              </div>
               <textarea
                 name="canvasToken"
                 rows={3}
