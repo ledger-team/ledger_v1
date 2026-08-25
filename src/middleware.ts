@@ -11,6 +11,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 function isPublic(pathname: string): boolean {
   if (pathname === '/') return true
   if (pathname === '/login' || pathname.startsWith('/login/')) return true
+  if (pathname === '/privacy') return true // data/trust page; linked from onboarding
   if (pathname.startsWith('/api/auth')) return true
   if (pathname.startsWith('/api/smoke')) return true // dev-only routes; they self-404 in prod
   if (pathname.startsWith('/api/health')) return true // uptime probe
