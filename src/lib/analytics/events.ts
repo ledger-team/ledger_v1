@@ -38,6 +38,11 @@ export const EVENTS = {
     // Emitted from Milestone E onward.
     completed: 'onboarding.completed',
   },
+  study: {
+    // Emitted from Phase 1 onward (study tab).
+    note_added: 'study.note.added',
+    viewed: 'study.viewed',
+  },
   smoke: {
     logger: 'smoke.logger.info',
     posthog: 'smoke.posthog.test',

@@ -29,6 +29,11 @@ function makeTx() {
       ),
     },
     enrollment: { upsert: vi.fn().mockResolvedValue({}) },
+    gradeSnapshot: {
+      // No prior snapshot by default, so a first sync always records one.
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({}),
+    },
   }
 }
 
@@ -93,12 +98,59 @@ describe('syncUserCanvas (service-role writes)', () => {
   it('full success upserts every entity type, bumps lastSyncedAt, returns ok', async () => {
     const res = await syncUserCanvas('u1', factoryFor(fakeClient()))
     expect(res.status).toBe('ok')
-    expect(res.counts).toEqual({ courses: 1, sections: 1, enrollments: 1, assignments: 1 })
+    expect(res.counts).toEqual({
+      courses: 1,
+      sections: 1,
+      enrollments: 1,
+      assignments: 1,
+      gradeSnapshots: 1,
+    })
     // canvasUserId stamped inside the courses transaction.
     expect(dataOf(tx.user.update).some((d) => 'canvasUserId' in d)).toBe(true)
     // lastSyncedAt finalized on the service-role client.
     expect(dataOf(vi.mocked(prisma.user.update)).some((d) => 'lastSyncedAt' in d)).toBe(true)
     expect(tx.enrollment.upsert).toHaveBeenCalledTimes(1)
+  })
+
+  it('never writes a per-student grade onto the shared Course row', async () => {
+    // Course is unique on (schoolId, canvasCourseId), so one row is shared by
+    // every student at the school in that course. A grade written here would be
+    // overwritten by the next classmate to sync, and shown to them as their own.
+    await syncUserCanvas('u1', factoryFor(fakeClient()))
+    for (const call of tx.course.upsert.mock.calls) {
+      const arg = call[0] as { create: Record<string, unknown>; update: Record<string, unknown> }
+      for (const shape of [arg.create, arg.update]) {
+        expect(shape).not.toHaveProperty('currentScore')
+        expect(shape).not.toHaveProperty('currentGrade')
+        expect(shape).not.toHaveProperty('finalScore')
+        expect(shape).not.toHaveProperty('finalGrade')
+      }
+    }
+  })
+
+  it('records the grade against the user, not the course row', async () => {
+    await syncUserCanvas('u1', factoryFor(fakeClient()))
+    expect(tx.gradeSnapshot.create).toHaveBeenCalledTimes(1)
+    expect(dataOf(tx.gradeSnapshot.create)[0]).toMatchObject({
+      userId: 'u1',
+      courseId: 'c_1',
+      score: 91.5,
+      grade: 'A-',
+    })
+  })
+
+  it('skips the snapshot when the grade has not moved', async () => {
+    // Sync runs on every login; writing unchanged readings would bury real moves.
+    tx.gradeSnapshot.findFirst.mockResolvedValue({ score: 91.5, grade: 'A-' })
+    const res = await syncUserCanvas('u1', factoryFor(fakeClient()))
+    expect(tx.gradeSnapshot.create).not.toHaveBeenCalled()
+    expect(res.counts.gradeSnapshots).toBe(0)
+  })
+
+  it('records a snapshot when only the letter grade changes', async () => {
+    tx.gradeSnapshot.findFirst.mockResolvedValue({ score: 91.5, grade: 'B+' })
+    await syncUserCanvas('u1', factoryFor(fakeClient()))
+    expect(tx.gradeSnapshot.create).toHaveBeenCalledTimes(1)
   })
 
   it('partial failure (assignments) keeps earlier types and does NOT bump lastSyncedAt', async () => {

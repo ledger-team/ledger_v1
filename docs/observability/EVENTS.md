@@ -74,3 +74,12 @@ Not every event belongs in every layer. The pattern:
 | Errors | ✓ (level=error) | — | only if sensitive | ✓ |
 
 When in doubt, log to Pino. Audit is reserved for sensitive actions per FERPA. PostHog is reserved for product analytics — never PII.
+
+## study
+
+Emitted from Phase 1 onward (Study tab, assignment detail, notes).
+
+| Event | Layer | When | Payload |
+| --- | --- | --- | --- |
+| `study.viewed` | PostHog | Study tab rendered | `userId` |
+| `study.note.added` | Pino | A student saves a note or checklist item on an assignment | `userId`, `assignmentId` (never the note body — it is student-authored content) |

@@ -43,7 +43,13 @@ import {
 } from './canvas'
 
 export type SyncStatus = 'ok' | 'partial' | 'auth_error' | 'unavailable' | 'no_token' | 'error'
-export type SyncCounts = { courses: number; sections: number; enrollments: number; assignments: number }
+export type SyncCounts = {
+  courses: number
+  sections: number
+  enrollments: number
+  assignments: number
+  gradeSnapshots: number
+}
 export type SyncResult = { status: SyncStatus; counts: SyncCounts }
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
@@ -56,7 +62,13 @@ export async function syncUserCanvas(
   userId: string,
   createClient: typeof createCanvasClient = createCanvasClient,
 ): Promise<SyncResult> {
-  const counts: SyncCounts = { courses: 0, sections: 0, enrollments: 0, assignments: 0 }
+  const counts: SyncCounts = {
+    courses: 0,
+    sections: 0,
+    enrollments: 0,
+    assignments: 0,
+    gradeSnapshots: 0,
+  }
 
   const report = (err: unknown, phase: string) => {
     logger.error(
@@ -119,18 +131,20 @@ export async function syncUserCanvas(
   const sectionIdByCanvas = new Map<number, string>()
 
   // Courses (+ stamp canvasUserId on the user).
+  //
+  // Grades deliberately do NOT go on the Course row. One Course row is shared by
+  // every student at the school in that Canvas course (@@unique([schoolId,
+  // canvasCourseId])), so writing the syncing user's score there means the last
+  // student to sync overwrites what every classmate sees — wrong numbers, and a
+  // leak of one student's grade to another. Per-user grades are appended to
+  // GradeSnapshot below.
   try {
     await prisma.$transaction(async (tx) => {
       await tx.user.update({ where: { id: userId }, data: { canvasUserId } })
       for (const c of courses) {
-        const g = studentGrade(c)
         const data = {
           name: c.name,
           courseCode: c.course_code,
-          currentGrade: g?.computed_current_grade ?? null,
-          currentScore: g?.computed_current_score ?? null,
-          finalGrade: g?.computed_final_grade ?? null,
-          finalScore: g?.computed_final_score ?? null,
           lastSyncedAt: new Date(),
         }
         const row = await tx.course.upsert({
@@ -140,6 +154,22 @@ export async function syncUserCanvas(
           select: { id: true },
         })
         courseIdByCanvas.set(c.id, row.id)
+
+        // Append a grade snapshot only when the number actually moved. Sync runs
+        // on every login, so writing unconditionally would bury real changes in
+        // thousands of identical rows.
+        const g = studentGrade(c)
+        const score = g?.computed_current_score ?? null
+        const grade = g?.computed_current_grade ?? null
+        const latest = await tx.gradeSnapshot.findFirst({
+          where: { userId, courseId: row.id },
+          orderBy: { capturedAt: 'desc' },
+          select: { score: true, grade: true },
+        })
+        if (!latest || latest.score !== score || latest.grade !== grade) {
+          await tx.gradeSnapshot.create({ data: { userId, courseId: row.id, score, grade } })
+          counts.gradeSnapshots++
+        }
       }
     })
     counts.courses = courses.length

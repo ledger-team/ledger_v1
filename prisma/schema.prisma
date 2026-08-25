@@ -51,6 +51,8 @@ model User {
   studyGuides StudyGuide[]
   dailyLimits DailyLimit[]
   auditEvents AuditLog[]    @relation("AuditActor")
+  gradeSnapshots GradeSnapshot[]
+  assignmentNotes AssignmentNote[]
 
   @@unique([schoolId, canvasUserId])
   @@index([schoolId])
@@ -144,6 +146,11 @@ model Course {
   canvasCourseId String
   name           String
   courseCode     String
+  /// DEPRECATED - do not read these four. A Course row is shared by every
+  /// student at the school in that Canvas course (@@unique below), so writing a
+  /// per-student grade here means the last syncing student overwrites what
+  /// everyone else sees. Per-user grades live in GradeSnapshot. Kept only so the
+  /// column drop can happen in a later migration once nothing references them.
   currentGrade   String?
   currentScore   Float?
   finalGrade     String?
@@ -155,6 +162,7 @@ model Course {
   school      School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   sections    Section[]
   assignments Assignment[]
+  gradeSnapshots GradeSnapshot[]
 
   @@unique([schoolId, canvasCourseId]) // fixes v1's "uniqueness in code only"
   @@index([schoolId])
@@ -204,6 +212,7 @@ model Assignment {
 
   course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
   studyGuides StudyGuide[]
+  notes       AssignmentNote[]
 
   @@unique([courseId, canvasId])
   @@index([courseId, dueAt]) // closes v1's "no indexes" — the dashboard's hot query
@@ -324,6 +333,56 @@ model DailyLimit {
 
   @@unique([userId, date, feature])
   @@index([userId, date])
+}
+
+// =========================================================================
+// Grades - per user, append-only history.
+//
+// Course.currentScore CANNOT hold a grade: one Course row is shared by every
+// student at the school in that Canvas course, so per-student values there are
+// overwritten by whoever synced last (and leak between classmates). Grades are
+// keyed (userId, courseId) here instead.
+//
+// Append-only by design: sync writes a row only when the score actually moves,
+// so the table stays small and "your grade over time" is a plain ORDER BY.
+// There is no backfill - history begins the day this ships.
+// =========================================================================
+
+model GradeSnapshot {
+  id         String   @id @default(cuid())
+  userId     String
+  courseId   String
+  score      Float? // computed_current_score, 0-100
+  grade      String? // letter grade when the course publishes one
+  capturedAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId, courseId, capturedAt]) // history for one course
+  @@index([userId, capturedAt]) // "what changed recently" across all courses
+}
+
+// =========================================================================
+// Student-authored notes and checklist items on an assignment. No Canvas
+// involvement, which is the point: 98% of synced assignments have an empty
+// description, and this content comes from the student instead.
+// =========================================================================
+
+model AssignmentNote {
+  id           String   @id @default(cuid())
+  userId       String
+  assignmentId String
+  body         String   @db.Text
+  done         Boolean  @default(false) // checklist item when true/false is meaningful
+  position     Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, assignmentId, position])
 }
 
 // =========================================================================
