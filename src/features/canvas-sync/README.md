@@ -33,5 +33,23 @@ sync → dashboard.
   **inline** in the server action (no background jobs in Phase 0).
 - Partial failure is tolerated: a later entity type failing leaves earlier types
   committed; the user lands on the dashboard with a `?sync=<status>` banner.
-- There is no in-app "re-sync" button yet — that arrives with the real dashboard
-  in Milestone G.
+## When sync runs
+
+Two entry points. Until the manual one existed, sync ran **once per user, ever**,
+during onboarding — so a student's data froze at signup and `GradeSnapshot` could
+never collect a second reading, which made grade history impossible in principle.
+
+| Trigger | Where | Notes |
+| --- | --- | --- |
+| Onboarding | `src/app/onboarding/actions.ts` | Inline, blocking, 15-40s. `maxDuration = 300` on that route. |
+| Manual | `actions.ts` → You tab | Rate limited to 4/hour/user. Canvas throttles, and a sync is several API calls per course. |
+
+**Still open: nothing syncs in the background.** A student who never presses the
+button sees signup-day data forever, and grade history only advances when they
+happen to tap it. A scheduled job (Vercel Cron hitting a `CRON_SECRET`-gated route,
+oldest-stale-first with a time budget) is the intended fix; it was deferred pending
+the Vercel plan question below.
+
+**Vercel plan matters.** A serverless function is capped at 10s on Hobby and up to
+300s on Pro. A sync takes longer than 10s, so on Hobby the onboarding sync is killed
+mid-run and the student lands on a half-populated dashboard.

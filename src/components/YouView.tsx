@@ -2,6 +2,7 @@ import { ThemeToggle } from './ThemeToggle'
 import { SignOutButton } from './SignOutButton'
 import { DeleteAccountButton } from './DeleteAccountButton'
 import { Avatar } from './Avatar'
+import { ResyncButton } from './ResyncButton'
 
 export type YouViewProps = {
   name: string | null
@@ -59,6 +60,9 @@ export function YouView({ name, email, schoolName, canvasConnected, lastSyncedAt
           <span className="text-sm text-muted">Theme</span>
           <ThemeToggle />
         </div>
+        {/* Canvas also syncs on its own overnight; this is the "I just got a
+            grade back and want to see it now" path. */}
+        {canvasConnected && <ResyncButton />}
       </div>
 
       <div className="flex flex-col gap-3">

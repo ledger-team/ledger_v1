@@ -28,6 +28,7 @@ export const EVENTS = {
     sync_failed: 'canvas.sync.failed',
     token_encrypted: 'canvas.token.encrypted',
     token_decrypted: 'canvas.token.decrypted',
+    resync_requested: 'canvas.resync.requested',
   },
   dashboard: {
     // Emitted from Milestone G onward.

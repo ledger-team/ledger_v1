@@ -83,3 +83,14 @@ Emitted from Phase 1 onward (Study tab, assignment detail, notes).
 | --- | --- | --- | --- |
 | `study.viewed` | PostHog | Study tab rendered | `userId` |
 | `study.note.added` | Pino | A student saves a note or checklist item on an assignment | `userId`, `assignmentId` (never the note body — it is student-authored content) |
+
+
+## canvas (sync cadence)
+
+`syncUserCanvas` originally ran exactly once per user, during onboarding, so Canvas
+data froze at signup and `GradeSnapshot` could never collect a second reading. The
+manual re-sync is the current fix. A scheduled background sync is still open.
+
+| Event | Layer | When | Payload |
+| --- | --- | --- | --- |
+| `canvas.resync.requested` | Pino | A student presses "Sync Canvas now" on the You tab | `userId`, resulting `status` |
